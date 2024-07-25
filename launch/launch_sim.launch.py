@@ -8,7 +8,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 from launch_ros.actions import Node
-
+import subprocess
 
 
 def generate_launch_description():
@@ -18,6 +18,8 @@ def generate_launch_description():
     # !!! MAKE SURE YOU SET THE PACKAGE NAME CORRECTLY !!!
 
     package_name='articubot_one' #<--- CHANGE ME
+    ros2_command = "ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r /cmd_vel:=/teleop_cmd_vel --remap __node:=teleop_keyboard"
+    subprocess.run(["gnome-terminal", "--", "bash", "-c", f"{ros2_command}; exec bash"])
 
     rsp = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
@@ -32,6 +34,14 @@ def generate_launch_description():
                     get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')]),
                     launch_arguments={'extra_gazebo_args':'--ros-args --params-file ' + gazebo_params_file}.items()
              )
+    
+    twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
+    twist_mux = Node(
+            package="twist_mux",
+            executable="twist_mux",
+            parameters=[twist_mux_params, {'use_sim_time': True}],
+            remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
+        )
 
     # Run the spawner node from the gazebo_ros package. The entity name doesn't really matter if you only have a single robot.
     spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
@@ -54,6 +64,7 @@ def generate_launch_description():
     # Launch them all!
     return LaunchDescription([
         rsp,
+        twist_mux,
         gazebo,
         spawn_entity,
         diff_drive_spawner,
